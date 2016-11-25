@@ -3,64 +3,77 @@
 
 import requests
 from bs4 import BeautifulSoup
-import re
-import csv
 import time
 import datetime
 import random
 import logging
+import json
 
 import config
 
 random.seed(datetime.datetime.now())
 
-_job_table = {}
 
-
-def _get_job_table_in_page(bs_obj, out_q=None):
-    global _job_table
-    job_nodes = bs_obj.findAll("li", {"class": "jobinfo brjob clearfix"})
-    for job_node in job_nodes:
+def get_items_in_page(bs_obj, out_q=None):
+    item_nodes = bs_obj.findAll("li", {"class": "clear"})
+    logging.debug("抓取到%s条数据" % len(item_nodes))
+    for item_node in item_nodes:
         try:
-            job_tag = job_node.find("a", {"href": re.compile("^/j/[0-9]+")})
-            job = job_tag.strong.get_text()
-            enterprise = job_node.find("div", {"class": "jobnote-r"}).strong.get_text()
-            key = (enterprise, job)
-            if key not in _job_table:
-                _job_table[key] = job_tag.attrs["href"]
-                row = (enterprise, job, _job_table[key])
-                if out_q:
-                    out_q.put(row)
-                logging.debug(row)
+            container = item_node.find("div", {"class": "info clear"})
+            title_node = container.find("div", {"class": "title"}).find("a")
+            title = title_node.get_text()
+            detail_page_link = title_node.attrs["href"]
+
+            address_node = container.find("div", {"class": "houseInfo"})
+            address_info = address_node.get_text()
+
+            try:
+                xiaoqu, huxing, mianji, chaoxiang, zhuangxiu = address_info.split("|")
+            except ValueError:
+                continue
+
+            price_node = container.find("div", {"class": "totalPrice"})
+            price = price_node.find("span").get_text()
+
+            row = (detail_page_link, title, price,
+                   xiaoqu, huxing, mianji, chaoxiang, zhuangxiu)
+            row = tuple(item.strip() for item in row)
+            logging.debug(row)
+            if out_q:
+                out_q.put(row)
         except AttributeError:
             pass
 
 
 def _get_next_page_link(bs_obj):
-    page_link = bs_obj.find("div", {"class": "t_pagelink"})
-    next_page_link = page_link.find("a", {"class": "next"})
-    if next_page_link is not None:
-        return next_page_link.attrs["href"]
+    list_page_box = bs_obj.find("div", {"class": "page-box house-lst-page-box"})
+    page_info = json.loads(list_page_box.attrs["page-data"])
+    if page_info["totalPage"] == page_info["curPage"]:
+        return None
+    else:
+        next_page = page_info["curPage"] + 1
+        return "/ershoufang/pg%s" % next_page
 
 
-def get_jobs(sentinel, out_q=None):
+def get_items(sentinel, out_q=None):
     """
-    从“内推网”抓取职位列表
+    从目标网站抓取item列表
     :param sentinel: 标示数据结束的哨兵值
     :param out_q:　用于存储输出结果的数据结构，必须实现put()方法
-    :return: dict对象，形式为{(公司，职位): 链接}
+    :return: 所抓取的条目数量
     """
     host = config.host
     headers = config.headers
     proxies = config.proxies
     first_page = config.first_page
     page = first_page
+    cnt = 0
     while page:
         try:
             response = requests.get(url="http://"+host+page, headers=headers, proxies=proxies)
             if response.status_code == 200:
                 bs_obj = BeautifulSoup(response.content, "lxml")
-                _get_job_table_in_page(bs_obj, out_q=out_q)
+                get_items_in_page(bs_obj, out_q=out_q)
                 next_page = _get_next_page_link(bs_obj)
                 if page == next_page:
                     break
@@ -68,10 +81,11 @@ def get_jobs(sentinel, out_q=None):
             else:
                 break
             time.sleep(random.randint(0, 5)+1)
+            cnt += 1
         except requests.exceptions.ConnectionError:
             pass
     out_q.put(sentinel)
-    return _job_table
+    return cnt
 
 
 if __name__ == "__main__":
@@ -81,18 +95,18 @@ if __name__ == "__main__":
     from threading import Thread
 
     q = Queue()
+    sentinel = object()
 
-    def consumer(in_q):
+    def consumer(sentinel, in_q):
         while True:
-            print(in_q.get())
+            data = in_q.get()
+            print(data)
+            if data is sentinel:
+                break
 
-    job_list_file = config.job_list_file
-    with open(job_list_file, "w+") as csv_file:
-        writer = csv.writer(csv_file)
-        writer.writerow(("enterprise", "job", "link"))
 
-        t1 = Thread(target=get_jobs, args=(q,))
-        t2 = Thread(target=consumer, args=(q,))
-        t1.start()
-        t2.start()
+    t1 = Thread(target=get_items, args=(sentinel, q))
+    t2 = Thread(target=consumer, args=(sentinel, q))
+    t1.start()
+    t2.start()
 
