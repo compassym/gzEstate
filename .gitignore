@@ -1,0 +1,7 @@
+.idea/*
+*.pyc
+*.swp
+log/*
+__pycache__/*
+
+data/*
