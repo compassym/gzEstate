@@ -30,6 +30,11 @@ proxies = {
     "https": "socks5://localhost:1080"
 }
 
+phantomjs_args = [
+    "--proxy=localhost:1080",
+    "--proxy-type=socks5"
+]
+
 # 用于存储item列表，可供后续采集详细的描述信息提供链接
 item_list_file = "./data/item_list.csv"
 

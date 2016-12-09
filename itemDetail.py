@@ -2,7 +2,7 @@
 # -*- coding:utf-8 -*-
 
 from http.client import RemoteDisconnected
-import requests
+from selenium import webdriver
 from bs4 import BeautifulSoup
 import logging
 import re
@@ -12,7 +12,11 @@ import config
 
 class ItemDetail:
     def __init__(self, page_link):
+        self.driver = webdriver.PhantomJS(service_args=config.phantomjs_args)
+
+        self.url="http://"+ config.host + page_link
         self.bs_obj = None
+
         self.lat = None
         self.lnt = None
         self.price_shoufu = None
@@ -26,15 +30,10 @@ class ItemDetail:
         self._get_detail(page_link)
 
     def _get_detail(self, page_link):
-        headers = config.headers
-        host = config.host
-        proxies = config.proxies
         try:
-            response = requests.get(url="http://"+host + page_link,
-                                    headers=headers,
-                                    proxies=proxies)
-            if response.status_code == 200:
-                self.bs_obj = BeautifulSoup(response.content, "lxml")
+            self.driver.get(url=self.url)
+            if self.driver.page_source:
+                self.bs_obj = BeautifulSoup(self.driver.page_source, "lxml")
                 self.lat, self.lnt = self.get_position(self.bs_obj)
                 self.get_price_shoufu()
                 self.get_nianxian()
@@ -42,6 +41,8 @@ class ItemDetail:
                 self.get_transaction_info()
         except RemoteDisconnected as e:
             logging.error(e)
+        finally:
+            self.driver.quit()
 
     def get_position(self, bs_obj):
         """
@@ -68,9 +69,6 @@ class ItemDetail:
             tax_node = self.bs_obj.find("div", {"class": "tax"})
             price_shoufu_txt = tax_node.find("span").get_text()
             self.price_shoufu = re.match(r"[^0-9]*((?:\d+)(?:\.\d+|)).*", price_shoufu_txt).groups()[0]
-            # TODO 这里需要修正
-            # 爬虫得到的是一个死数，实际上应该是一个js计算结果
-            self.price_tax = tax_node.find("span", {"id": "PanelTax"}).get_text()
             logging.debug("首付: %s, 税费: %s" % (self.price_shoufu, self.price_tax))
         except AttributeError:
             pass
