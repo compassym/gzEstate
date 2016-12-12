@@ -110,14 +110,6 @@ def consumer(sentinel, in_q):
     pool = ThreadPoolExecutor(128)
     db_file = get_db_file()
 
-    with sqlite3.connect(db_file) as db_conn:
-        cursor = db_conn.cursor()
-        create_table(cursor)
-        db_conn.commit()
-
-    house_detail_parser = ItemDetail()
-    sql = construct_insert_sql()
-
     def call_back(future):
         detail = future.result()
         data = [detail[key[0]] for key in _KeyOfDetails]
@@ -131,6 +123,14 @@ def consumer(sentinel, in_q):
                 db_conn.commit()
             except sqlite3.ProgrammingError as e:
                 logging.error(e)
+
+    with sqlite3.connect(db_file) as db_conn:
+        cursor = db_conn.cursor()
+        create_table(cursor)
+        db_conn.commit()
+
+    house_detail_parser = ItemDetail()
+    sql = construct_insert_sql()
 
     while True:
         try:

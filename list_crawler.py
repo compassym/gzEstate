@@ -28,20 +28,7 @@ def get_items_in_page(bs_obj, out_q=None):
             detail_page_link = title_node.attrs["href"]
             detail_page_link = _PreURLPattern.sub("", detail_page_link)
 
-            address_node = container.find("div", {"class": "houseInfo"})
-            address_info = address_node.get_text()
-
-            try:
-                xiaoqu, huxing, mianji, chaoxiang, zhuangxiu = address_info.split("|")
-            except ValueError:
-                continue
-
-            price_node = container.find("div", {"class": "totalPrice"})
-            price = price_node.find("span").get_text()
-
-            row = (detail_page_link, title, price,
-                   xiaoqu, huxing, mianji, chaoxiang, zhuangxiu)
-            row = tuple(item.strip() for item in row)
+            row = (detail_page_link, title)
             logging.debug(row)
             if out_q:
                 out_q.put(row)
