@@ -44,6 +44,7 @@ _KeyOfHuxing = [
     ("卫", "INTEGER"),
 ]
 
+
 def get_db_file():
     if tools.check_dir(config.db_dir):
         db_dir = config.db_dir
@@ -51,6 +52,7 @@ def get_db_file():
         logging.error("按照配置文件构建数据库存储目录失败，将在当前目录构建数据库文件!")
         db_dir = "./"
     return get_new_db_file(db_dir, config.db)
+
 
 def get_new_db_file(db_dir, db_file):
     path_pre = os.path.join(db_dir, db_file)
@@ -62,6 +64,9 @@ def get_new_db_file(db_dir, db_file):
     return "".join([path_pre, ".", str(path_suf)])
 
 
+_DB_File = get_db_file()
+
+
 def create_table(cursor):
     """
     创建数据库表
@@ -70,28 +75,26 @@ def create_table(cursor):
     """
     sql_components = ["CREATE TABLE houses(id INTEGER PRIMARY KEY"]
     sql_components.extend(
-        [ ''.join(["'", item[0], "' ", item[1]]) for item in _KeyOfDetails]
+        [''.join(["'", item[0], "' ", item[1]]) for item in _KeyOfDetails]
     )
     sql_components.extend(
-        [ ''.join(["'", item[0], "' ", item[1]]) for item in _KeyOfHuxing]
+        [''.join(["'", item[0], "' ", item[1]]) for item in _KeyOfHuxing]
     )
 
-    sql = ", ".join(sql_components)
-    sql = sql + ");"
+    sql = ", ".join(sql_components) + ");"
     logging.debug("数据表创建sql语句为: ")
     logging.debug(sql)
     cursor.execute(sql)
 
+
 def construct_insert_sql():
-    sql_components = ["INSERT INTO houses("]
-    sql_components.append(",".join(
-        ["".join(["'", item[0], "'"]) for item in _KeyOfDetails]
-    ))
-    sql_components.append(",")
-    sql_components.append(",".join(
-        ["".join(["'", item[0], "'"]) for item in _KeyOfHuxing]
-    ))
-    sql_components.append(") VALUES(")
+    sql_components = [
+        "INSERT INTO houses(",
+        ",".join(["".join(["'", item[0], "'"]) for item in _KeyOfDetails]),
+        ",",
+        ",".join(["".join(["'", item[0], "'"]) for item in _KeyOfHuxing]),
+        ") VALUES("
+    ]
     data_len = len(_KeyOfDetails) + len(_KeyOfHuxing)
     sql_components.append(
         ",".join(("?" for _ in range(data_len)))
@@ -102,46 +105,49 @@ def construct_insert_sql():
     logging.debug(sql)
     return sql
 
-def get_detail(parser, page_link):
-    parser.set_page_link(page_link)
-    return parser.detail
 
-def consumer(sentinel, in_q):
-    pool = ThreadPoolExecutor(128)
-    db_file = get_db_file()
+def get_detail(page_link):
+    detail_parser = ItemDetail()
+    detail_parser.set_page_link(page_link)
+    return detail_parser.detail
 
-    def call_back(future):
-        detail = future.result()
+
+def call_back(future):
+    global _DB_File
+    detail = future.result()
+    try:
         data = [detail[key[0]] for key in _KeyOfDetails]
         data.extend(
             [detail["房屋户型"][key[0]] for key in _KeyOfHuxing]
         )
-        with sqlite3.connect(db_file) as db_conn:
-            try:
-                cursor = db_conn.cursor()
-                cursor.execute(sql, data)
-                db_conn.commit()
-            except sqlite3.ProgrammingError as e:
-                logging.error(e)
+    except KeyError as e:
+        logging.error("房源 %s 处理有误:  %s" % (detail["链家编号"], e))
+        return
 
-    with sqlite3.connect(db_file) as db_conn:
+    sql = construct_insert_sql()
+    with sqlite3.connect(_DB_File) as db_conn:
+        try:
+            cursor = db_conn.cursor()
+            cursor.execute(sql, data)
+            db_conn.commit()
+        except sqlite3.ProgrammingError as e:
+            logging.error("房源 %s 数据写入数据库错误! %s" %
+                          (detail["链家编号"], e))
+
+
+def consumer(sentinel, in_q):
+    pool = ThreadPoolExecutor(128)
+    global _DB_File
+
+    with sqlite3.connect(_DB_File) as db_conn:
         cursor = db_conn.cursor()
         create_table(cursor)
         db_conn.commit()
 
-    house_detail_parser = ItemDetail()
-    sql = construct_insert_sql()
-
     while True:
-        try:
-            house_meta_data = in_q.get()
-            if house_meta_data is sentinel:
-                break
-            page_link = house_meta_data[0]
-            submit = pool.submit(get_detail,
-                                 house_detail_parser,
-                                 page_link)
-            submit.add_done_callback(call_back)
-        except KeyError as e:
-            logging.error("房源%s记录发生错误: %s" % (page_link, e))
-            pass
+        house_meta_data = in_q.get()
+        if house_meta_data is sentinel:
+            break
+        page_link = house_meta_data[0]
+        submit = pool.submit(get_detail, page_link)
+        submit.add_done_callback(call_back)

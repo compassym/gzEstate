@@ -194,12 +194,16 @@ class ItemDetail:
                 "三": 3, "四": 4, "五": 5,
                 "六": 6, "七": 7, "八": 8,
                 "九": 9, "十": 10, "十一": 11,
-                "十二": 12, "十三": 13, "十四": 14
+                "十二": 12, "十三": 13, "十四": 14,
+                "十五": 15, "十六": 16, "十七": 17,
+                "十八": 18, "十九": 19, "二十": 20,
+                "二十一": 21, "二十二": 22, "二十三": 23,
+                "二十四": 24, "二十五": 25, "二十六": 26
             }
             match = ItemDetail.tihu_pattern.match(self.detail["梯户比例"])
             ti, hu = match.groups()
             self.detail["梯户比例"] = float(cn_cnt[ti])/float(cn_cnt[hu])
-        except (AttributeError, IndexError) as e:
+        except (AttributeError, IndexError, KeyError) as e:
             logging.warning("清洗房源%s梯户比例数据失败! %s" %
                             (self.page_link, e))
 
