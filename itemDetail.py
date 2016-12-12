@@ -14,14 +14,15 @@ class ItemDetail:
     huxing_pattern = re.compile(r"(\d)室(\d)厅(\d)厨(\d)卫")
     louceng_pattern = re.compile(r"(.*)楼层.*")
     tihu_pattern = re.compile(r"(.*)梯(.*)户")
-    square_pattern = re.compile(r"(\d*(?:\.\d*)?).*")
+    number_pattern = re.compile(r"(\d+(?:\.\d*)?).*")
 
     def __init__(self, page_link):
         self.driver = webdriver.PhantomJS(
             service_args=config.phantomjs_args
         )
 
-        self.url = "http://"+ config.host + page_link
+        self.page_link = page_link
+        self.url = "http://"+ config.host + self.page_link
         self.bs_obj = None
 
         self.detail = {}
@@ -35,14 +36,81 @@ class ItemDetail:
                 self.bs_obj = BeautifulSoup(self.driver.page_source, "lxml")
                 self.detail["纬度"], self.detail["经度"] = self.get_position(self.bs_obj)
                 self.get_school()
+                self.get_overview()
                 self.get_base_detail()
-                # self.get_price_shoufu()
-                # self.get_nianxian()
-                # self.get_transaction_info()
+
+                for label, value in self.detail.items():
+                    logging.debug("%s: %s" % (label, value))
         except RemoteDisconnected as e:
             logging.error(e)
         finally:
             self.driver.quit()
+
+    def get_overview(self ):
+        """
+        从网页右上角提取房屋总体信息
+        """
+        try:
+            self.get_price()
+            self.get_zhuangxiu()
+            self.get_niandai()
+            self.get_xiaoqu()
+        except AttributeError as e:
+            logging.warning(e)
+
+    def get_price(self):
+        try:
+            total_price = self.bs_obj.find("div", {"class": "price"}) \
+                                     .find("span", {"class": "total"}) \
+                                     .get_text()
+            self.detail["总价"] = float(total_price)
+
+            shoufu_node = self.bs_obj.find("div", {"class": "tax"}) \
+                                     .findAll("span")[0]
+            shoufu = ItemDetail.number_pattern \
+                               .search(shoufu_node.get_text()).groups()[0]
+            self.detail["首付"] = float(shoufu)
+            tax = self.bs_obj.find("span", {"id": "PanelTax"}).get_text()
+            self.detail["税费"] = float(tax)
+        except AttributeError as e:
+            logging.warning("房源%s获取总价/首付/税费信息失败! %s" %
+                            (self.page_link, e))
+
+    def get_zhuangxiu(self):
+        try:
+            zhuangxiu = self.bs_obj.find("div", {"class": "houseInfo"}) \
+                                   .find("div", {"class": "type"}) \
+                                   .find("div", {"class": "subInfo"})
+            self.detail["装修"] = zhuangxiu.get_text()
+        except AttributeError as e:
+            logging.warning("房源%s获取装修信息失败! %s" %
+                            (self.page_link, e))
+
+    def get_niandai(self):
+        try:
+            niandai = self.bs_obj.find("div", {"class": "houseInfo"}) \
+                .find("div", {"class": "area"}) \
+                .find("div", {"class": "subInfo"}) \
+                .get_text()
+            niandai_match = ItemDetail.number_pattern.search(niandai)
+            self.detail["建筑年代"] = int(niandai_match.groups()[0])
+        except AttributeError as e:
+            logging.warning("房源%s获取建筑年代信息失败! %s" %
+                            (self.page_link, e))
+
+    def get_xiaoqu(self):
+        try:
+            xiaoqu = self.bs_obj.find("div", {"class": "communityName"}) \
+                .find("a", {"class": "info"})
+            self.detail["小区"] = xiaoqu.get_text()
+            areaName = self.bs_obj.find("div", {"class": "areaName"}) \
+                .find("span", {"class": "info"}) \
+                .findAll("a")
+            self.detail["行政区"] = areaName[0].get_text()
+            self.detail["板块"] = areaName[1].get_text()
+        except AttributeError as e:
+            logging.warning("房源%s获取小区/板块/区划信息失败! %s" %
+                            (self.page_link, e))
 
     def get_position(self, bs_obj):
         """
@@ -78,9 +146,6 @@ class ItemDetail:
             self.wash_tihubili()
             self.wash_square()
             self.wash_dianti()
-
-            for label, value in self.detail.items():
-                logging.debug("%s: %s" % (label, value))
         except AttributeError:
             pass
 
@@ -93,22 +158,28 @@ class ItemDetail:
             for idx, item in enumerate(items):
                 cnt = item_cnt.groups()[idx]
                 self.detail["房屋户型"][item] = int(cnt)
-        except (AttributeError, IndexError):
-            pass
+        except (AttributeError, IndexError) as e:
+            logging.warning("清洗房源%s户型数据失败! %s" %
+                            (self.page_link, e))
 
     def wash_louceng(self):
         try:
             self.detail["所在楼层"] = ItemDetail.louceng_pattern \
                 .match(self.detail["所在楼层"]) \
                 .groups()[0]
-        except (AttributeError, IndexError):
-            pass
+        except (AttributeError, IndexError) as e:
+            logging.warning("清洗房源%s楼层数据失败! %s" %
+                            (self.page_link, e))
 
     def wash_square(self):
+        pattern = ItemDetail.number_pattern
         try:
-            pattern = ItemDetail.square_pattern
             square_match = pattern.match(self.detail["建筑面积"])
             self.detail["建筑面积"] = float(square_match.groups()[0])
+        except (AttributeError, IndexError, ValueError) as e:
+            logging.warning("清洗房源%s建筑面积数据失败! %s" %
+                            (self.page_link, e))
+        try:
             square_match = pattern.match(self.detail["套内面积"])
             self.detail["套内面积"] = float(square_match.groups()[0])
         except (AttributeError, IndexError, ValueError):
@@ -126,38 +197,14 @@ class ItemDetail:
             match = ItemDetail.tihu_pattern.match(self.detail["梯户比例"])
             ti, hu = match.groups()
             self.detail["梯户比例"] = float(cn_cnt[ti])/float(cn_cnt[hu])
-        except (AttributeError, IndexError):
-            pass
+        except (AttributeError, IndexError) as e:
+            logging.warning("清洗房源%s梯户比例数据失败! %s" %
+                            (self.page_link, e))
 
     def wash_dianti(self):
         self.detail["配备电梯"] = True \
-            if self.detail["配备电梯"] == "有" \
+            if self.detail.get("配备电梯") == "有" \
             else False
-
-    def get_price_shoufu(self):
-        """
-        从BeautifulSoup对象提取首付及税费信息
-        :return: None
-        """
-        try:
-            tax_node = self.bs_obj.find("div", {"class": "tax"})
-            price_shoufu_txt = tax_node.find("span").get_text()
-            self.detail["首付"] = re.match(r"[^0-9]*((?:\d+)(?:\.\d+|)).*", price_shoufu_txt).groups()[0]
-            logging.debug("首付: %s, 税费: %s" % (self.detail["首付"], self.detail["税费"]))
-        except AttributeError:
-            pass
-
-    def get_nianxian(self):
-        """
-        从BeautifulSoup对象提取房屋年限信息
-        :return: None
-        """
-        try:
-            area_node = self.bs_obj.find("div", {"class": "area"})
-            self.detail["建筑年限"] = area_node.find("div", {"class": "subInfo"}).get_text()
-            logging.debug("建筑年限: %s" % self.detail["建筑年限"])
-        except AttributeError:
-            pass
 
     def get_school(self):
         """
@@ -168,26 +215,9 @@ class ItemDetail:
             node = self.bs_obj.find("div", {"id": "matchSchool"})
             self.detail["对口学校"] = node.find("span", {"class": "fortitle"}).find("a").get_text()
             logging.debug("对口学校: %s" % self.detail["对口学校"])
-        except AttributeError:
-            pass
-
-    def get_transaction_info(self):
-        """
-        从BeautifulSoup对象提取房屋交易信息
-        :return: None
-        """
-        try:
-            info_node = self.bs_obj.find("div", {"class": "introContent"})\
-                                   .find("div", {"class": "transaction"})\
-                                   .findAll("li")
-            self.detail["挂牌时间"] = self.remove_label(info_node[0])
-            self.last_transaction = self.remove_label(info_node[2])
-            self.detail["房本年限"] = self.remove_label(info_node[4])
-            logging.debug("挂牌时间: %s, 上次交易: %s, 房本年限: %s"
-                          % (self.detail["挂牌时间"], self.last_transaction, self.detail["房本年限"]))
-
-        except AttributeError:
-            pass
+        except AttributeError as e:
+            logging.warning("房源%s学位信息获取失败! %s" %
+                            (self.page_link, e))
 
     def remove_label(self, bs_obj):
         txt = bs_obj.get_text()
