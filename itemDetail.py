@@ -16,16 +16,18 @@ class ItemDetail:
     tihu_pattern = re.compile(r"(.*)梯(.*)户")
     number_pattern = re.compile(r"(\d+(?:\.\d*)?).*")
 
-    def __init__(self, page_link):
+    def __init__(self):
         self.driver = webdriver.PhantomJS(
             service_args=config.phantomjs_args
         )
 
+    def set_page_link(self, page_link):
         self.page_link = page_link
         self.url = "http://"+ config.host + self.page_link
         self.bs_obj = None
 
         self.detail = {}
+        self.detail["链家编号"] = page_link
         self._get_detail()
 
     def _get_detail(self):
@@ -43,8 +45,6 @@ class ItemDetail:
                     logging.debug("%s: %s" % (label, value))
         except RemoteDisconnected as e:
             logging.error(e)
-        finally:
-            self.driver.quit()
 
     def _get_overview(self):
         """
@@ -52,7 +52,6 @@ class ItemDetail:
         """
         try:
             self._read_price()
-            self._read_zhuangxiu()
             self._read_niandai()
             self._read_xiaoqu()
         except AttributeError as e:
@@ -64,26 +63,28 @@ class ItemDetail:
                                      .find("span", {"class": "total"}) \
                                      .get_text()
             self.detail["总价"] = float(total_price)
+        except AttributeError as e:
+            self.detail["总价"] = 0
+            logging.warning("房源%s获取总价失败! %s" %
+                            (self.page_link, e))
 
+        try:
             shoufu_node = self.bs_obj.find("div", {"class": "tax"}) \
                                      .findAll("span")[0]
             shoufu = ItemDetail.number_pattern \
                                .search(shoufu_node.get_text()).groups()[0]
             self.detail["首付"] = float(shoufu)
+        except AttributeError as e:
+            self.detail["首付"] = 0
+            logging.warning("房源%s获取首付失败! %s" %
+                            (self.page_link, e))
+
+        try:
             tax = self.bs_obj.find("span", {"id": "PanelTax"}).get_text()
             self.detail["税费"] = float(tax)
         except AttributeError as e:
-            logging.warning("房源%s获取总价/首付/税费信息失败! %s" %
-                            (self.page_link, e))
-
-    def _read_zhuangxiu(self):
-        try:
-            zhuangxiu = self.bs_obj.find("div", {"class": "houseInfo"}) \
-                                   .find("div", {"class": "type"}) \
-                                   .find("div", {"class": "subInfo"})
-            self.detail["装修"] = zhuangxiu.get_text()
-        except AttributeError as e:
-            logging.warning("房源%s获取装修信息失败! %s" %
+            self.detail["税费"] = 0
+            logging.warning("房源%s获取税费失败! %s" %
                             (self.page_link, e))
 
     def _read_niandai(self):
@@ -95,6 +96,7 @@ class ItemDetail:
             niandai_match = ItemDetail.number_pattern.search(niandai)
             self.detail["建筑年代"] = int(niandai_match.groups()[0])
         except AttributeError as e:
+            self.detail["建筑年代"] = -1
             logging.warning("房源%s获取建筑年代信息失败! %s" %
                             (self.page_link, e))
 
@@ -218,6 +220,7 @@ class ItemDetail:
         except AttributeError as e:
             logging.warning("房源%s学位信息获取失败! %s" %
                             (self.page_link, e))
+            self.detail["对口学校"] = None
 
     def _get_transaction_info(self):
         """
@@ -237,6 +240,11 @@ class ItemDetail:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
-    test_links = ["/ershoufang/GZ0002238316.html", "/ershoufang/GZ0002197589.html"]
+    test_links = [
+        "/ershoufang/GZ0002273962.html",
+        "/ershoufang/GZ0002186316.html",
+        "/ershoufang/GZ0002281204.html",
+    ]
+    detail_parser = ItemDetail()
     for link in test_links:
-        house_detail = ItemDetail(link)
+        house_detail = detail_parser.set_page_link(link)
