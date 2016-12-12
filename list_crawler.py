@@ -8,10 +8,13 @@ import datetime
 import random
 import logging
 import json
+import re
 
 import config
 
 random.seed(datetime.datetime.now())
+
+_PreURLPattern = re.compile(r"((?:http://)?gz.lianjia.com)?")
 
 
 def get_items_in_page(bs_obj, out_q=None):
@@ -23,6 +26,7 @@ def get_items_in_page(bs_obj, out_q=None):
             title_node = container.find("div", {"class": "title"}).find("a")
             title = title_node.get_text()
             detail_page_link = title_node.attrs["href"]
+            detail_page_link = _PreURLPattern.sub("", detail_page_link)
 
             address_node = container.find("div", {"class": "houseInfo"})
             address_info = address_node.get_text()

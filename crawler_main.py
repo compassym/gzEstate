@@ -8,7 +8,7 @@ from threading import Thread
 
 import config
 import list_crawler
-from detail_crawler import get_detail
+from detail_crawler import consumer
 import tools
 
 
@@ -28,9 +28,9 @@ def main():
     log_setting()
 
     sentinel = object()
-    q = Queue()
-    t1 = Thread(target=list_crawler.get_jobs, args=(sentinel, q))
-    t2 = Thread(target=get_detail, args=(sentinel, q))
+    q = Queue(config.size_of_queue)
+    t1 = Thread(target=list_crawler.get_items, args=(sentinel, q))
+    t2 = Thread(target=consumer, args=(sentinel, q))
     t1.start()
     t2.start()
     q.join()

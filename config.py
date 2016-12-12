@@ -45,5 +45,9 @@ log_format = "%(asctime)s %(levelname)s: %(message)s"
 log_level = logging.DEBUG
 
 # 存储所爬取职位信息的数据库文件
-db = "item_list.db"
+db = "houses.db"
 db_dir = "./data"
+
+
+# 缓冲区大小
+size_of_queue = 90
