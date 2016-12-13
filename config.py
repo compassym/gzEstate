@@ -52,4 +52,8 @@ db_dir = "./data"
 # 缓冲区大小
 size_of_queue = 90
 
+# 工作线程数量
+cnt_of_worker = 12
+
+# 读取列表项错误时的最大重试次数
 retry_cnt = 10

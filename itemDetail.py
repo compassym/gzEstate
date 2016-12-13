@@ -6,8 +6,12 @@ from selenium import webdriver
 from bs4 import BeautifulSoup
 import logging
 import re
+import datetime, time, random
 
 import config
+
+
+random.seed(datetime.datetime.now())
 
 
 class ItemDetail:
@@ -32,21 +36,34 @@ class ItemDetail:
         self._get_detail()
 
     def _get_detail(self):
-        try:
-            self.driver.set_window_size(800, 600)
-            self.driver.get(url=self.url)
-            if self.driver.page_source:
-                self.bs_obj = BeautifulSoup(self.driver.page_source, "lxml")
-                self.detail["纬度"], self.detail["经度"] = self.get_position(self.bs_obj)
-                self._get_school()
-                self._get_overview()
-                self._get_base_detail()
-                self._get_transaction_info()
+        retry_cnt = config.retry_cnt
+        while True:
+            try:
+                self.driver.set_window_size(800, 600)
+                time.sleep(random.randint(1, config.cnt_of_worker+1))
+                self.driver.get(url=self.url)
+                if self.driver.page_source:
+                    self.bs_obj = BeautifulSoup(self.driver.page_source, "lxml")
+                    self.detail["纬度"], self.detail["经度"] = self.get_position(self.bs_obj)
+                    self._get_school()
+                    self._get_overview()
+                    self._get_base_detail()
+                    self._get_transaction_info()
 
-                for label, value in self.detail.items():
-                    logging.debug("%s: %s" % (label, value))
-        except RemoteDisconnected as e:
-            logging.error(e)
+                    for label, value in self.detail.items():
+                        logging.debug("%s: %s" % (label, value))
+                break
+            except (RemoteDisconnected,
+                    ConnectionError,
+                    ConnectionResetError,
+                    ConnectionAbortedError,
+                    ConnectionRefusedError,
+                    ) as e:
+                msg = "读取房源%s(%s)详细信息时发生错误: %s, 最多再尝试%s次!"
+                logging.error(msg % (self.detail["标题"], self.page_link, e, retry_cnt))
+                if retry_cnt <= 0:
+                    break
+                retry_cnt -= 1
 
     def _get_overview(self):
         """
