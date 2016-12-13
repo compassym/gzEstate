@@ -3,8 +3,6 @@
 
 import logging
 import os
-from queue import Queue
-from threading import Thread
 from concurrent.futures import ThreadPoolExecutor
 
 import config
@@ -13,22 +11,26 @@ import detail_crawler
 import tools
 
 
-_ThreadPool = ThreadPoolExecutor(128)
+_ThreadPool = ThreadPoolExecutor(1)
 
 def log_setting():
     if tools.check_dir(config.log_dir):
         log_file = os.path.join(config.log_dir, "log.txt")
         logging.basicConfig(level=config.log_level,
                             format=config.log_format,
-                            # filename=log_file
+                            filename=log_file
                             )
+        console = logging.StreamHandler()
+        console.setLevel(logging.INFO)
+        logging.getLogger('').addHandler(console)
     else:
         logging.basicConfig(level=config.log_level,
                             format=config.log_format)
 
-def consumer(page_link):
+def consumer(page_link, title):
     global _ThreadPool
-    future = _ThreadPool.submit(detail_crawler.get_detail, page_link)
+    future = _ThreadPool.submit(detail_crawler.get_detail,
+                                page_link, title)
     future.add_done_callback(detail_crawler.write2db)
 
 

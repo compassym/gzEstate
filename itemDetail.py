@@ -21,17 +21,19 @@ class ItemDetail:
             service_args=config.phantomjs_args
         )
 
-    def set_page_link(self, page_link):
+    def set_page_link(self, page_link, title):
         self.page_link = page_link
         self.url = "http://"+ config.host + self.page_link
         self.bs_obj = None
 
         self.detail = {}
+        self.detail["标题"] = title
         self.detail["链家编号"] = page_link
         self._get_detail()
 
     def _get_detail(self):
         try:
+            self.driver.set_window_size(800, 600)
             self.driver.get(url=self.url)
             if self.driver.page_source:
                 self.bs_obj = BeautifulSoup(self.driver.page_source, "lxml")
@@ -65,8 +67,8 @@ class ItemDetail:
             self.detail["总价"] = float(total_price)
         except AttributeError as e:
             self.detail["总价"] = 0
-            logging.warning("房源%s获取总价失败! %s" %
-                            (self.page_link, e))
+            logging.warning("房源: %s(%s)获取总价失败! %s" %
+                            (self.detail["标题"], self.page_link, e))
 
         try:
             shoufu_node = self.bs_obj.find("div", {"class": "tax"}) \
@@ -76,16 +78,16 @@ class ItemDetail:
             self.detail["首付"] = float(shoufu)
         except AttributeError as e:
             self.detail["首付"] = 0
-            logging.warning("房源%s获取首付失败! %s" %
-                            (self.page_link, e))
+            logging.warning("房源: %s(%s)获取首付失败! %s" %
+                            (self.detail["标题"], self.page_link, e))
 
         try:
             tax = self.bs_obj.find("span", {"id": "PanelTax"}).get_text()
             self.detail["税费"] = float(tax)
         except AttributeError as e:
             self.detail["税费"] = 0
-            logging.warning("房源%s获取税费失败! %s" %
-                            (self.page_link, e))
+            logging.warning("房源: %s(%s)获取税费失败! %s" %
+                            (self.detail["标题"], self.page_link, e))
 
     def _read_niandai(self):
         try:
@@ -97,8 +99,8 @@ class ItemDetail:
             self.detail["建筑年代"] = int(niandai_match.groups()[0])
         except AttributeError as e:
             self.detail["建筑年代"] = -1
-            logging.warning("房源%s获取建筑年代信息失败! %s" %
-                            (self.page_link, e))
+            logging.warning("房源: %s(%s)获取建筑年代失败! %s" %
+                            (self.detail["标题"], self.page_link, e))
 
     def _read_xiaoqu(self):
         try:
@@ -111,8 +113,8 @@ class ItemDetail:
             self.detail["行政区"] = areaName[0].get_text()
             self.detail["板块"] = areaName[1].get_text()
         except AttributeError as e:
-            logging.warning("房源%s获取小区/板块/区划信息失败! %s" %
-                            (self.page_link, e))
+            logging.warning("房源: %s(%s)获取行政区/板块/小区失败! %s" %
+                            (self.detail["标题"], self.page_link, e))
 
     def get_position(self, bs_obj):
         """
@@ -161,8 +163,8 @@ class ItemDetail:
                 cnt = item_cnt.groups()[idx]
                 self.detail["房屋户型"][item] = int(cnt)
         except (AttributeError, IndexError) as e:
-            logging.warning("清洗房源%s户型数据失败! %s" %
-                            (self.page_link, e))
+            logging.warning("房源: %s(%s)清洗户型数据失败! %s" %
+                            (self.detail["标题"], self.page_link, e))
 
     def _wash_louceng(self):
         try:
@@ -170,8 +172,8 @@ class ItemDetail:
                 .match(self.detail["所在楼层"]) \
                 .groups()[0]
         except (AttributeError, IndexError) as e:
-            logging.warning("清洗房源%s楼层数据失败! %s" %
-                            (self.page_link, e))
+            logging.warning("房源: %s(%s)清洗楼层数据失败! %s" %
+                            (self.detail["标题"], self.page_link, e))
 
     def _wash_square(self):
         pattern = ItemDetail.number_pattern
@@ -179,8 +181,8 @@ class ItemDetail:
             square_match = pattern.match(self.detail["建筑面积"])
             self.detail["建筑面积"] = float(square_match.groups()[0])
         except (AttributeError, IndexError, ValueError) as e:
-            logging.warning("清洗房源%s建筑面积数据失败! %s" %
-                            (self.page_link, e))
+            logging.warning("房源: %s(%s)清洗建筑面积数据失败! %s" %
+                            (self.detail["标题"], self.page_link, e))
         try:
             square_match = pattern.match(self.detail["套内面积"])
             self.detail["套内面积"] = float(square_match.groups()[0])
@@ -204,8 +206,8 @@ class ItemDetail:
             ti, hu = match.groups()
             self.detail["梯户比例"] = float(cn_cnt[ti])/float(cn_cnt[hu])
         except (AttributeError, IndexError, KeyError) as e:
-            logging.warning("清洗房源%s梯户比例数据失败! %s" %
-                            (self.page_link, e))
+            logging.warning("房源: %s(%s)清洗梯户比例数据失败! %s" %
+                            (self.detail["标题"], self.page_link, e))
 
     def _wash_dianti(self):
         self.detail["配备电梯"] = True \
@@ -222,8 +224,8 @@ class ItemDetail:
             self.detail["对口学校"] = node.find("span", {"class": "fortitle"}).find("a").get_text()
             logging.debug("对口学校: %s" % self.detail["对口学校"])
         except AttributeError as e:
-            logging.warning("房源%s学位信息获取失败! %s" %
-                            (self.page_link, e))
+            logging.warning("房源: %s(%s)读取学位信息失败! %s" %
+                            (self.detail["标题"], self.page_link, e))
             self.detail["对口学校"] = None
 
     def _get_transaction_info(self):
@@ -245,10 +247,11 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
     test_links = [
+        "/ershoufang/GZ0002267836.html",
         "/ershoufang/GZ0002273962.html",
         "/ershoufang/GZ0002186316.html",
         "/ershoufang/GZ0002281204.html",
     ]
     detail_parser = ItemDetail()
     for link in test_links:
-        house_detail = detail_parser.set_page_link(link)
+        house_detail = detail_parser.set_page_link(link, "")

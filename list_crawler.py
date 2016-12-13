@@ -33,20 +33,26 @@ def get_items_in_page(bs_obj, out_q=None, callback=None):
             if out_q:
                 out_q.put(row)
             if callback:
-                callback(detail_page_link)
+                callback(detail_page_link, title)
         except AttributeError:
             pass
     return len(item_nodes)
 
 
 def _get_next_page_link(bs_obj):
-    list_page_box = bs_obj.find("div", {"class": "page-box house-lst-page-box"})
-    page_info = json.loads(list_page_box.attrs["page-data"])
-    if page_info["totalPage"] == page_info["curPage"]:
-        return None
-    else:
-        next_page = page_info["curPage"] + 1
-        return "/ershoufang/pg%s" % next_page
+    cnt = 10
+    while cnt>0:
+        try:
+            list_page_box = bs_obj.find("div", {"class": "page-box house-lst-page-box"})
+            page_info = json.loads(list_page_box.attrs["page-data"])
+            if page_info["totalPage"] == page_info["curPage"]:
+                return None
+            else:
+                next_page = page_info["curPage"] + 1
+                return "/ershoufang/pg%s" % next_page
+        except (AttributeError, KeyError):
+            cnt -= 1
+            logging.warning("尝试读取下一页失败! 最多再尝试%s次..." % cnt)
 
 
 def get_items(sentinel, out_q=None, callback=None):
@@ -64,6 +70,7 @@ def get_items(sentinel, out_q=None, callback=None):
     page = first_page
     cnt = 0
     while page:
+        logging.info("开始抓取页面: %s" % page)
         try:
             response = requests.get(url="http://"+host+page, headers=headers, proxies=proxies)
             if response.status_code == 200:

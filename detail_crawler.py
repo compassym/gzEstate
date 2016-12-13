@@ -10,7 +10,7 @@ import tools
 
 
 _KeyOfDetails = [
-    ("链家编号", "TEXT"),
+    ("链家编号", "TEXT"), ("标题", "TEXT"),
 
     ("总价", "FLOAT"), ("首付", "FLOAT"), ("税费", "FLOAT"),
 
@@ -102,9 +102,9 @@ def construct_insert_sql():
     return sql
 
 
-def get_detail(page_link):
+def get_detail(page_link, title):
     detail_parser = ItemDetail()
-    detail_parser.set_page_link(page_link)
+    detail_parser.set_page_link(page_link, title)
     return detail_parser.detail
 
 
