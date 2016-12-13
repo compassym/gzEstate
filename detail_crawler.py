@@ -119,9 +119,12 @@ def create_db():
         db_conn.commit()
 
 
-def write2db(future):
+def write2db_for_pool_callback(future):
     global _DB_File
     detail = future.result()
+    write2db(detail)
+
+def write2db(detail):
     try:
         data = [detail[key[0]] for key in _KeyOfDetails]
         data.extend(
