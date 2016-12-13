@@ -40,7 +40,6 @@ def main():
     sentinel = object()
     detail_crawler.create_db()
     cnt = list_crawler.get_items(sentinel=sentinel, callback=consumer)
-    logging.info("抓取结束，一共获得%s条房源信息" % cnt)
 
 
 main()

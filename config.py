@@ -51,3 +51,5 @@ db_dir = "./data"
 
 # 缓冲区大小
 size_of_queue = 90
+
+retry_cnt = 10

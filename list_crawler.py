@@ -40,19 +40,16 @@ def get_items_in_page(bs_obj, out_q=None, callback=None):
 
 
 def _get_next_page_link(bs_obj):
-    cnt = 10
-    while cnt>0:
-        try:
-            list_page_box = bs_obj.find("div", {"class": "page-box house-lst-page-box"})
-            page_info = json.loads(list_page_box.attrs["page-data"])
-            if page_info["totalPage"] == page_info["curPage"]:
-                return None
-            else:
-                next_page = page_info["curPage"] + 1
-                return "/ershoufang/pg%s" % next_page
-        except (AttributeError, KeyError):
-            cnt -= 1
-            logging.warning("尝试读取下一页失败! 最多再尝试%s次..." % cnt)
+    try:
+        list_page_box = bs_obj.find("div", {"class": "page-box house-lst-page-box"})
+        page_info = json.loads(list_page_box.attrs["page-data"])
+        if page_info["totalPage"] == page_info["curPage"]:
+            return None
+        else:
+            next_page = page_info["curPage"] + 1
+            return "/ershoufang/pg%s" % next_page
+    except (AttributeError, KeyError):
+        pass
 
 
 def get_items(sentinel, out_q=None, callback=None):
@@ -68,29 +65,47 @@ def get_items(sentinel, out_q=None, callback=None):
     proxies = config.proxies
     first_page = config.first_page
     page = first_page
-    cnt = 0
+    house_cnt = 0
+    retry_cnt = config.retry_cnt
+
     while page:
         logging.info("开始抓取页面: %s" % page)
         try:
-            response = requests.get(url="http://"+host+page, headers=headers, proxies=proxies)
-            if response.status_code == 200:
-                bs_obj = BeautifulSoup(response.content, "lxml")
-                new_items_cnt = get_items_in_page(bs_obj,
-                                                  out_q=out_q,
-                                                  callback=callback)
-                cnt += new_items_cnt
-                next_page = _get_next_page_link(bs_obj)
-                if page == next_page:
+            response = requests.get(url="http://"+host+page,
+                                    headers=headers,
+                                    proxies=proxies)
+            if response.status_code != 200:
+                if retry_cnt>0:
+                    logging.warning("获取列表页失败，最多再尝试%s次"
+                                    % retry_cnt)
+                    retry_cnt -= 1
+                    continue
+                else:
                     break
-                page = next_page
-            else:
-                break
-            time.sleep(random.randint(0, 5)+1)
+
+            bs_obj = BeautifulSoup(response.content, "lxml")
+            new_items_cnt = get_items_in_page(bs_obj,
+                                              out_q=out_q,
+                                              callback=callback)
+            house_cnt += new_items_cnt
+            next_page = _get_next_page_link(bs_obj)
+            if next_page is None or page == next_page:
+                if retry_cnt>0:
+                    logging.warning("获取列表页失败，最多再尝试%s次"
+                                    % retry_cnt)
+                    retry_cnt -= 1
+                    continue
+                else:
+                    break
+            page = next_page
+            retry_cnt = config.retry_cnt
         except requests.exceptions.ConnectionError:
             pass
+
+    logging.info("抓取结束，一共获得%s条房源信息" % house_cnt)
     if out_q:
         out_q.put(sentinel)
-    return cnt
+    return house_cnt
 
 
 if __name__ == "__main__":
