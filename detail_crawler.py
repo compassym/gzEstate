@@ -3,7 +3,6 @@
 import sqlite3
 import os
 import logging
-from concurrent.futures import ThreadPoolExecutor
 
 import config
 from itemDetail import ItemDetail
@@ -64,9 +63,6 @@ def get_new_db_file(db_dir, db_file):
     return "".join([path_pre, ".", str(path_suf)])
 
 
-_DB_File = get_db_file()
-
-
 def create_table(cursor):
     """
     创建数据库表
@@ -112,7 +108,18 @@ def get_detail(page_link):
     return detail_parser.detail
 
 
-def call_back(future):
+_DB_File = get_db_file()
+
+
+def create_db():
+    global _DB_File
+    with sqlite3.connect(_DB_File) as db_conn:
+        cursor = db_conn.cursor()
+        create_table(cursor)
+        db_conn.commit()
+
+
+def write2db(future):
     global _DB_File
     detail = future.result()
     try:
@@ -120,6 +127,7 @@ def call_back(future):
         data.extend(
             [detail["房屋户型"][key[0]] for key in _KeyOfHuxing]
         )
+        logging.info("房源 %s 处理完毕!" % detail["链家编号"])
     except KeyError as e:
         logging.error("房源 %s 处理有误:  %s" % (detail["链家编号"], e))
         return
@@ -133,21 +141,3 @@ def call_back(future):
         except sqlite3.ProgrammingError as e:
             logging.error("房源 %s 数据写入数据库错误! %s" %
                           (detail["链家编号"], e))
-
-
-def consumer(sentinel, in_q):
-    pool = ThreadPoolExecutor(128)
-    global _DB_File
-
-    with sqlite3.connect(_DB_File) as db_conn:
-        cursor = db_conn.cursor()
-        create_table(cursor)
-        db_conn.commit()
-
-    while True:
-        house_meta_data = in_q.get()
-        if house_meta_data is sentinel:
-            break
-        page_link = house_meta_data[0]
-        submit = pool.submit(get_detail, page_link)
-        submit.add_done_callback(call_back)

@@ -17,7 +17,7 @@ random.seed(datetime.datetime.now())
 _PreURLPattern = re.compile(r"((?:http://)?gz.lianjia.com)?")
 
 
-def get_items_in_page(bs_obj, out_q=None):
+def get_items_in_page(bs_obj, out_q=None, callback=None):
     item_nodes = bs_obj.findAll("li", {"class": "clear"})
     logging.debug("抓取到%s条数据" % len(item_nodes))
     for item_node in item_nodes:
@@ -32,8 +32,11 @@ def get_items_in_page(bs_obj, out_q=None):
             logging.debug(row)
             if out_q:
                 out_q.put(row)
+            if callback:
+                callback(detail_page_link)
         except AttributeError:
             pass
+    return len(item_nodes)
 
 
 def _get_next_page_link(bs_obj):
@@ -46,11 +49,12 @@ def _get_next_page_link(bs_obj):
         return "/ershoufang/pg%s" % next_page
 
 
-def get_items(sentinel, out_q=None):
+def get_items(sentinel, out_q=None, callback=None):
     """
     从目标网站抓取item列表
     :param sentinel: 标示数据结束的哨兵值
     :param out_q:　用于存储输出结果的数据结构，必须实现put()方法
+    :param callback:　针对每一条房源记录的回调函数
     :return: 所抓取的条目数量
     """
     host = config.host
@@ -64,7 +68,10 @@ def get_items(sentinel, out_q=None):
             response = requests.get(url="http://"+host+page, headers=headers, proxies=proxies)
             if response.status_code == 200:
                 bs_obj = BeautifulSoup(response.content, "lxml")
-                get_items_in_page(bs_obj, out_q=out_q)
+                new_items_cnt = get_items_in_page(bs_obj,
+                                                  out_q=out_q,
+                                                  callback=callback)
+                cnt += new_items_cnt
                 next_page = _get_next_page_link(bs_obj)
                 if page == next_page:
                     break
@@ -72,10 +79,10 @@ def get_items(sentinel, out_q=None):
             else:
                 break
             time.sleep(random.randint(0, 5)+1)
-            cnt += 1
         except requests.exceptions.ConnectionError:
             pass
-    out_q.put(sentinel)
+    if out_q:
+        out_q.put(sentinel)
     return cnt
 
 
@@ -100,4 +107,3 @@ if __name__ == "__main__":
     t2 = Thread(target=consumer, args=(sentinel, q))
     t1.start()
     t2.start()
-

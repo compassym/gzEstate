@@ -5,12 +5,15 @@ import logging
 import os
 from queue import Queue
 from threading import Thread
+from concurrent.futures import ThreadPoolExecutor
 
 import config
 import list_crawler
-from detail_crawler import consumer
+import detail_crawler
 import tools
 
+
+_ThreadPool = ThreadPoolExecutor(128)
 
 def log_setting():
     if tools.check_dir(config.log_dir):
@@ -23,19 +26,19 @@ def log_setting():
         logging.basicConfig(level=config.log_level,
                             format=config.log_format)
 
+def consumer(page_link):
+    global _ThreadPool
+    future = _ThreadPool.submit(detail_crawler.get_detail, page_link)
+    future.add_done_callback(detail_crawler.write2db)
+
 
 def main():
     log_setting()
 
     sentinel = object()
-    q = Queue(config.size_of_queue)
-    t1 = Thread(target=list_crawler.get_items, args=(sentinel, q))
-    t2 = Thread(target=consumer, args=(sentinel, q))
-    t1.start()
-    t2.start()
-    q.join()
-    t1.join()
-    t2.join()
+    detail_crawler.create_db()
+    cnt = list_crawler.get_items(sentinel=sentinel, callback=consumer)
+    logging.info("抓取结束，一共获得%s条房源信息" % cnt)
 
 
 main()
