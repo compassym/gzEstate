@@ -3,11 +3,10 @@
 
 import requests
 from bs4 import BeautifulSoup
-import datetime
-import random
 import logging
 import json
 import re
+import time, random, datetime
 
 import config
 
@@ -98,9 +97,11 @@ def get_items(sentinel, out_q=None, callback=None):
                     break
             page = next_page
             retry_cnt = config.retry_cnt
-        except requests.exceptions.ConnectionError:
-            pass
-
+        except requests.exceptions.ConnectionError as e:
+            sleep = random.randint(1, 10)
+            logging.error("读取页面:%s失败: %s，%s秒后重试"
+                          % (page, e, sleep))
+            time.sleep(sleep)
     logging.info("抓取结束，一共获得%s条房源信息" % house_cnt)
     if out_q:
         out_q.put(sentinel)
