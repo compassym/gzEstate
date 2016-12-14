@@ -5,7 +5,7 @@ import os
 import logging
 
 import config
-from itemDetail import ItemDetail
+from item_detail import ItemDetail
 import tools
 
 
