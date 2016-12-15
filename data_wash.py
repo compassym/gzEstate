@@ -29,55 +29,51 @@ class NormalizeMap:
     """
 
     def __init__(self, dataset: pd.DataFrame):
-        # TODO
-        pass
-
-    def map(self, key:str):
-        # TODO 直接返回现在HouseFrame._normalize[key]即可
-        pass
-
-    def reverse_map(self, value:float):
-        # TODO 将value值转换为最初数据集中的原始值
-        pass
-
-
-class HouseFrame:
-    """
-    处理房源列表
-    """
-
-    def __init__(self, db_conn, table, fields):
         """
-        读取数据，并初始化HouseFrame
-        :param db_conn: 数据库链接，HouseFrame实例将从该链接读取数据
-        :param table: 数据库中存储目标数据的表
-        :param fields: table表中将要读取的数据域
+        根据数据集建立每一列数据的归一化映射表
+        :param dataset: 待处理的数据集
         """
-        self._df = None
-        self._dataset = None
-        self._normalize_map = {}
-        self._read_frame(db_conn, table, fields)
-        self._construct_normalize_map()
-        logging.debug(self.df)
-        self._normalize()
+        self._normalize_map = {
+            column: self.map_field2number(dataset[column])
+            for column in dataset.columns
+            if dataset[column].dtype.name == "object"
+            }
+        for column in dataset.columns:
+            if dataset[column].dtype.name != "object":
+                self._normalize_map[column] = \
+                    (dataset[column].min(), dataset[column].max())
+        logging.debug("归一化映射表为: %s" % (self._normalize_map,))
 
-    def _read_frame(self, db_conn, table, fields):
-        query = " ".join(
-            ["SELECT ",
-             ", ".join(fields),
-             " FROM ",
-             table,
-             ";"]
-        )
-        self._df = pd.io.sql.read_sql(query, db_conn)
+    def normalize(self, field:str, value):
+        """
+        将field数据域的原始数据值value进行归一化计算后返回
+        :param field: dataset数据集中field数据域键名
+        :param value: 待归一化的数据
+        :return: float 归一化后的数据值
+        """
+        table = self._normalize_map[field]
+        if(isinstance(table, tuple)):
+            min, max = table
+            return (float(value)-min)/(max-min)
+        else:
+            return table[value]
 
-        def convert2number(x):
-            try:
-                return float(x)
-            except ValueError:
-                return np.NaN
+    def de_normalize(self, field:str, value:float):
+        """
+        将field数据域对应的归一化数据之value还原为原始数据值
+        :param field: dataset数据集中field数据域键名
+        :param value: 已归一化的数据
+        :return:  还原为原始数据后的值
+        """
+        table = self._normalize_map[field]
+        if(isinstance(table, tuple)):
+            min, max = table
+            return min + value*(max-min)
+        else:
+            for k,v in table.items():
+                if abs(value-v) < 0.00000001:
+                    return k
 
-        self._df["梯户比例"] = self._df["梯户比例"].map(convert2number)
 
     @staticmethod
     def map_field2number(series: pd.Series):
@@ -102,25 +98,49 @@ class HouseFrame:
         return {item: step*index
                 for index, item in enumerate(unique_values)}
 
-    def _construct_normalize_map(self):
-        self._normalize_map = {
-            column: self.map_field2number(self.df[column])
-            for column in self.df.columns
-            if self.df[column].dtype.name == "object"
-        }
-        for column in self.df.columns:
-            if self.df[column].dtype.name != "object":
-                self._normalize_map[column] = \
-                    (self.df[column].min(), self.df[column].max())
-        logging.debug("归一化映射表为: %s" % (self._normalize_map,))
+
+class HouseFrame:
+    """
+    处理房源列表
+    """
+
+    def __init__(self, db_conn, table, fields):
+        """
+        读取数据，并初始化HouseFrame
+        :param db_conn: 数据库链接，HouseFrame实例将从该链接读取数据
+        :param table: 数据库中存储目标数据的表
+        :param fields: table表中将要读取的数据域
+        """
+        self._df = None
+        self._dataset = None
+        self._read_frame(db_conn, table, fields)
+        logging.debug(self.df)
+        self._normalize_map = NormalizeMap(self.df)
+        self._normalize()
+
+    def _read_frame(self, db_conn, table, fields):
+        query = " ".join(
+            ["SELECT ",
+             ", ".join(fields),
+             " FROM ",
+             table,
+             ";"]
+        )
+        self._df = pd.io.sql.read_sql(query, db_conn)
+
+        def convert2number(x):
+            try:
+                return float(x)
+            except ValueError:
+                return np.NaN
+
+        self._df["梯户比例"] = self._df["梯户比例"].map(convert2number)
 
     def _normalize(self):
-        for column, table in self._normalize_map.items():
-            if isinstance(table, dict):
-                fn = lambda x: table[x]
-            else:
-                fn = lambda x: float(x-table[0])/(table[1]-table[0])
-            self.df[column] = self.df[column].map(fn)
+        for column in self.df.columns:
+            self.df[column] = self.df[column].map(
+                lambda x: self._normalize_map.normalize(column, x)
+            )
 
     @property
     def df(self):
