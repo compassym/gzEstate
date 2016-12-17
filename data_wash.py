@@ -71,7 +71,7 @@ class NormalizeMap:
             return min + value*(max-min)
         else:
             for k,v in table.items():
-                if abs(value-v) < 0.00000001:
+                if abs(value-v) < 0.00001:
                     return k
 
 
@@ -137,10 +137,12 @@ class HouseFrame:
         self._df["梯户比例"] = self._df["梯户比例"].map(convert2number)
 
     def _normalize(self):
+        self._df = self.df.fillna(-1)
         for column in self.df.columns:
             self.df[column] = self.df[column].map(
                 lambda x: self._normalize_map.normalize(column, x)
             )
+        # self._df = self.df.dropna()
 
     @property
     def df(self):
@@ -172,15 +174,23 @@ class HouseFrame:
             return self._dataset
 
 
+def read_house_frame():
+    with sqlite3.connect(_DB_File) as db_conn:
+        house_frame = HouseFrame(db_conn, "houses", _Fields)
+        return house_frame.dataset
+
+
+
 if __name__ == "__main__":
     def _main():
         logging.basicConfig(level=logging.DEBUG)
-        with sqlite3.connect(_DB_File) as db_conn:
-            house_frame = HouseFrame(db_conn, "houses", _Fields)
-            dataset = house_frame.dataset
-            print("输入数据:")
-            print(dataset["input"])
-            print("\n目标数据:")
-            print(dataset["target"])
+        dataset = read_house_frame()
+        print("输入数据:")
+        print(dataset["input"])
+        fn = lambda lst : any(np.isnan(x) for x in lst)
+        na_df = dataset["input"].apply(fn)
+        print(na_df)
+        print("\n目标数据:")
+        print(dataset["target"])
 
     _main()
