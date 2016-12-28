@@ -19,6 +19,7 @@ class ItemDetail:
     louceng_pattern = re.compile(r"(.*)楼层.*")
     tihu_pattern = re.compile(r"(.*)梯(.*)户")
     number_pattern = re.compile(r"(\d+(?:\.\d*)?).*")
+    position_pattern = re.compile(r"(?<=resblockPosition:').*(?=',)")
 
     def __init__(self):
         self.driver = webdriver.PhantomJS(
@@ -42,9 +43,11 @@ class ItemDetail:
                 self.driver.set_window_size(800, 600)
                 time.sleep(random.randint(1, config.cnt_of_worker+1))
                 self.driver.get(url=self.url)
-                if self.driver.page_source:
-                    self.bs_obj = BeautifulSoup(self.driver.page_source, "lxml")
-                    self.detail["纬度"], self.detail["经度"] = self.get_position(self.bs_obj)
+                page_source = self.driver.page_source
+                if page_source:
+                    self.bs_obj = BeautifulSoup(page_source, "lxml")
+                    self.detail["纬度"], self.detail["经度"] = \
+                        self.get_position(page_source)
                     self._get_school()
                     self._get_overview()
                     self._get_base_detail()
@@ -133,20 +136,20 @@ class ItemDetail:
             logging.warning("房源: %s(%s)获取行政区/板块/小区失败! %s" %
                             (self.detail["标题"], self.page_link, e))
 
-    def get_position(self, bs_obj):
+    def get_position(self, page_source):
         """
         从BeautifulSoup对象提取地址信息
-        :param bs_obj: 从网页构造的BeautifulSoup对象
+        :param page_source: 网页原文件
         :return: tuple对象，("纬度值", "经度值")
         """
         try:
-            # 纬度
-            lat = bs_obj.find("input", {"id": "lat"}).attrs["value"]
-            # 经度
-            lnt = bs_obj.find("input", {"id": "lnt"}).attrs["value"]
+            logging.debug("尝试读取位置信息")
+            position = ItemDetail.position_pattern.findall(page_source)[0]
+            # 经度, 纬度
+            lnt, lat = [float(value) for value in position.split(",")]
             logging.debug("Position: (%s, %s)" % (lat, lnt))
-            return lat.strip(), lnt.strip()
-        except AttributeError:
+            return lat, lnt
+        except (AttributeError, IndexError):
             return None, None
 
     def _get_base_detail(self):
