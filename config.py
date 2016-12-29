@@ -57,3 +57,6 @@ cnt_of_worker = 12
 
 # 读取列表项错误时的最大重试次数
 retry_cnt = 10
+
+# 买家是否首套
+shoutao = True
