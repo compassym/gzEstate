@@ -32,8 +32,6 @@ _KeyOfDetails = [
 
     ("产权所属", "TEXT"), ("房本备件", "TEXT"), ("房屋用途", "TEXT"),
     ("交易权属", "TEXT"), ("抵押信息", "TEXT"),
-
-    ("供暖方式", "TEXT"),
 ]
 
 _KeyOfHuxing = [
