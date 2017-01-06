@@ -2,9 +2,26 @@
 
 import logging
 
-host = "gz.lianjia.com"
-first_page = "/ershoufang/pg1"
+######################################################################
+# 目标参数
+towns = ["panyu", "baiyun", "huadou"]
+city = "gz"
+host = "%s.lianjia.com" % (city,)
 
+######################################################################
+# 数据存储相关参数
+# 用于存储item列表，可供后续采集详细的描述信息提供链接
+item_list_file = "./data/item_list.csv"
+
+# 存储所爬取数据的数据库文件
+db = "houses.db"
+db_dir = "./data"
+
+
+
+######################################################################
+# 爬虫参数
+# HTTP Headers
 headers = {
     "Host": host,
     "User-Agent": "Mozilla/5.0(X11;Linux x86_64; rv:49.0) Gecko/20100101 Firefox/49.0",
@@ -24,30 +41,17 @@ headers = {
               "_gat_new_global=1; _gat_dianpu_agent=1"
 }
 
-
+# proxies for requests
 proxies = {
-    # "http": "socks5://localhost:1080",
-    # "https": "socks5://localhost:1080"
+    "http": "socks5://localhost:1080",
+    "https": "socks5://localhost:1080"
 }
 
+# proxies for phantomjs
 phantomjs_args = [
     "--proxy=localhost:1080",
     "--proxy-type=socks5"
 ]
-
-# 用于存储item列表，可供后续采集详细的描述信息提供链接
-item_list_file = "./data/item_list.csv"
-
-
-# 日志系统配置
-log_dir = "./log"
-log_format = "%(asctime)s %(levelname)s: %(message)s"
-log_level = logging.DEBUG
-
-# 存储所爬取职位信息的数据库文件
-db = "houses.db"
-db_dir = "./data"
-
 
 # 缓冲区大小
 size_of_queue = 90
@@ -58,5 +62,14 @@ cnt_of_worker = 6
 # 读取列表项错误时的最大重试次数
 retry_cnt = 10
 
+######################################################################
+# 日志参数
+# 日志系统配置
+log_dir = "./log"
+log_format = "%(asctime)s %(levelname)s: %(message)s"
+log_level = logging.DEBUG
+
+######################################################################
+# 买家自身特性参数
 # 买家是否首套
 shoutao = True

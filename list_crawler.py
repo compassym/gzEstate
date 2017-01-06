@@ -40,17 +40,18 @@ def get_items_in_page(bs_obj, out_q=None, callback=None):
 def _get_next_page_link(bs_obj):
     try:
         list_page_box = bs_obj.find("div", {"class": "page-box house-lst-page-box"})
+        page_url = list_page_box.attrs["page-url"]
         page_info = json.loads(list_page_box.attrs["page-data"])
         if page_info["totalPage"] == page_info["curPage"]:
             return None
         else:
             next_page = page_info["curPage"] + 1
-            return "/ershoufang/pg%s" % next_page
+            return page_url.replace("{page}", str(next_page))
     except (AttributeError, KeyError):
         pass
 
 
-def get_items(sentinel, out_q=None, callback=None):
+def get_items(sentinel, first_page, out_q=None, callback=None):
     """
     从目标网站抓取item列表
     :param sentinel: 标示数据结束的哨兵值
@@ -61,7 +62,6 @@ def get_items(sentinel, out_q=None, callback=None):
     host = config.host
     headers = config.headers
     proxies = config.proxies
-    first_page = config.first_page
     page = first_page
     house_cnt = 0
     retry_cnt = config.retry_cnt
@@ -102,9 +102,11 @@ def get_items(sentinel, out_q=None, callback=None):
             logging.error("读取页面:%s失败: %s，%s秒后重试"
                           % (page, e, sleep))
             time.sleep(sleep)
-    logging.info("抓取结束，一共获得%s条房源信息" % house_cnt)
+        logging.debug("一次循环")
     if out_q:
-        out_q.put(sentinel)
+        for _ in range(config.cnt_of_worker):
+            out_q.put(sentinel)
+    logging.info("抓取结束，一共获得%s条房源信息" % house_cnt)
     return house_cnt
 
 
@@ -113,6 +115,7 @@ if __name__ == "__main__":
 
     from queue import Queue
     from threading import Thread
+    import tools
 
     q = Queue()
     sentinel = object()
@@ -125,7 +128,10 @@ if __name__ == "__main__":
                 break
 
 
-    t1 = Thread(target=get_items, args=(sentinel, q))
+    first_page = tools.first_page("tianhe")
+    t1 = Thread(target=get_items, args=(sentinel, first_page, q))
     t2 = Thread(target=consumer, args=(sentinel, q))
     t1.start()
     t2.start()
+    t1.join()
+    t2.join()

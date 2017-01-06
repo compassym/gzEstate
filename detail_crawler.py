@@ -43,14 +43,17 @@ _KeyOfHuxing = [
 ]
 
 
-def get_db_file():
+def get_db_file(town, city):
     if tools.check_dir(config.db_dir):
         db_dir = config.db_dir
     else:
         logging.error("按照配置文件构建数据库存储目录失败，将在当前目录构建数据库文件!")
         db_dir = "./"
     today = datetime.datetime.today()
-    db_file = config.db + today.strftime(".%Y%m%d")
+    pretend = "%s@%s" % (town.strip(), city) \
+              if town and town.strip() \
+              else "%s" % city
+    db_file = ".".join([pretend, config.db, today.strftime("%Y%m%d")])
     return get_new_db_file(db_dir, db_file)
 
 
@@ -109,11 +112,12 @@ def get_detail(page_link, title):
     return detail_parser.detail
 
 
-_DB_File = get_db_file()
+_DB_File = None
 
 
-def create_db():
+def init_db(town, city):
     global _DB_File
+    _DB_File = get_db_file(town, city)
     with sqlite3.connect(_DB_File) as db_conn:
         cursor = db_conn.cursor()
         create_table(cursor)
