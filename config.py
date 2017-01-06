@@ -4,8 +4,25 @@ import logging
 
 ######################################################################
 # 目标参数
-host = "gz.lianjia.com"
-first_page = "/ershoufang/haizhu/pg1"
+town = "tianhe"
+city = "gz"
+host = "%s.lianjia.com" % (city,)
+first_page = "/ershoufang/%s/pg1" % (town.strip(),) \
+             if town.strip() \
+             else "/ershoufang/pg1"
+
+######################################################################
+# 数据存储相关参数
+# 用于存储item列表，可供后续采集详细的描述信息提供链接
+item_list_file = "./data/item_list.csv"
+
+# 存储所爬取数据的数据库文件
+db = "%s@%s.houses.db" % (town.strip(), city) \
+     if town.strip() else \
+     "%s.houses.db"
+db_dir = "./data"
+
+
 
 ######################################################################
 # 爬虫参数
@@ -31,8 +48,8 @@ headers = {
 
 # proxies for requests
 proxies = {
-    # "http": "socks5://localhost:1080",
-    # "https": "socks5://localhost:1080"
+    "http": "socks5://localhost:1080",
+    "https": "socks5://localhost:1080"
 }
 
 # proxies for phantomjs
@@ -56,16 +73,6 @@ retry_cnt = 10
 log_dir = "./log"
 log_format = "%(asctime)s %(levelname)s: %(message)s"
 log_level = logging.DEBUG
-
-######################################################################
-# 数据存储相关参数
-# 用于存储item列表，可供后续采集详细的描述信息提供链接
-item_list_file = "./data/item_list.csv"
-
-# 存储所爬取职位信息的数据库文件
-db = "haizhu.houses.db"
-db_dir = "./data"
-
 
 ######################################################################
 # 买家自身特性参数
