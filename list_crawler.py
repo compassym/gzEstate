@@ -103,9 +103,11 @@ def get_items(sentinel, out_q=None, callback=None):
             logging.error("读取页面:%s失败: %s，%s秒后重试"
                           % (page, e, sleep))
             time.sleep(sleep)
-    logging.info("抓取结束，一共获得%s条房源信息" % house_cnt)
+        logging.debug("一次循环")
     if out_q:
-        out_q.put(sentinel)
+        for _ in range(config.cnt_of_worker):
+            out_q.put(sentinel)
+    logging.info("抓取结束，一共获得%s条房源信息" % house_cnt)
     return house_cnt
 
 
@@ -130,3 +132,5 @@ if __name__ == "__main__":
     t2 = Thread(target=consumer, args=(sentinel, q))
     t1.start()
     t2.start()
+    t1.join()
+    t2.join()

@@ -4,7 +4,7 @@ import logging
 
 ######################################################################
 # 目标参数
-town = "tianhe"
+town = "huangpugz"
 city = "gz"
 host = "%s.lianjia.com" % (city,)
 first_page = "/ershoufang/%s/pg1" % (town.strip(),) \

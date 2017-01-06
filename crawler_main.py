@@ -64,7 +64,9 @@ def main():
     for t in detail_crawler_threads:
         t.start()
 
+    logging.debug("爬虫工作中...")
     list_crawler_thread.join()
+    logging.debug("房源列表爬取结束")
     for t in detail_crawler_threads:
         t.join()
 
