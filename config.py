@@ -4,12 +4,9 @@ import logging
 
 ######################################################################
 # 目标参数
-town = "huangpugz"
+towns = ["panyu", "baiyun", "huadou"]
 city = "gz"
 host = "%s.lianjia.com" % (city,)
-first_page = "/ershoufang/%s/pg1" % (town.strip(),) \
-             if town.strip() \
-             else "/ershoufang/pg1"
 
 ######################################################################
 # 数据存储相关参数
@@ -17,9 +14,7 @@ first_page = "/ershoufang/%s/pg1" % (town.strip(),) \
 item_list_file = "./data/item_list.csv"
 
 # 存储所爬取数据的数据库文件
-db = "%s@%s.houses.db" % (town.strip(), city) \
-     if town.strip() else \
-     "%s.houses.db"
+db = "houses.db"
 db_dir = "./data"
 
 

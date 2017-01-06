@@ -51,7 +51,7 @@ def _get_next_page_link(bs_obj):
         pass
 
 
-def get_items(sentinel, out_q=None, callback=None):
+def get_items(sentinel, first_page, out_q=None, callback=None):
     """
     从目标网站抓取item列表
     :param sentinel: 标示数据结束的哨兵值
@@ -62,7 +62,6 @@ def get_items(sentinel, out_q=None, callback=None):
     host = config.host
     headers = config.headers
     proxies = config.proxies
-    first_page = config.first_page
     page = first_page
     house_cnt = 0
     retry_cnt = config.retry_cnt
@@ -116,6 +115,7 @@ if __name__ == "__main__":
 
     from queue import Queue
     from threading import Thread
+    import tools
 
     q = Queue()
     sentinel = object()
@@ -128,7 +128,8 @@ if __name__ == "__main__":
                 break
 
 
-    t1 = Thread(target=get_items, args=(sentinel, q))
+    first_page = tools.first_page("tianhe")
+    t1 = Thread(target=get_items, args=(sentinel, first_page, q))
     t2 = Thread(target=consumer, args=(sentinel, q))
     t1.start()
     t2.start()
