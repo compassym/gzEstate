@@ -26,8 +26,8 @@ headers = {
 
 
 proxies = {
-    "http": "socks5://localhost:1080",
-    "https": "socks5://localhost:1080"
+    # "http": "socks5://localhost:1080",
+    # "https": "socks5://localhost:1080"
 }
 
 phantomjs_args = [
@@ -53,7 +53,10 @@ db_dir = "./data"
 size_of_queue = 90
 
 # 工作线程数量
-cnt_of_worker = 12
+cnt_of_worker = 6
 
 # 读取列表项错误时的最大重试次数
 retry_cnt = 10
+
+# 买家是否首套
+shoutao = True

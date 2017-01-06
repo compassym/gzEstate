@@ -2,7 +2,7 @@
 # -*- coding:utf-8 -*-
 
 from http.client import RemoteDisconnected
-from selenium import webdriver
+import requests
 from bs4 import BeautifulSoup
 import logging
 import re
@@ -20,17 +20,17 @@ class ItemDetail:
     tihu_pattern = re.compile(r"(.*)梯(.*)户")
     number_pattern = re.compile(r"(\d+(?:\.\d*)?).*")
     position_pattern = re.compile(r"(?<=resblockPosition:').*(?=',)")
+    isUnique_pattern = re.compile(r"(?<=isUnique:').*(?=')")
 
     def __init__(self):
-        self.driver = webdriver.PhantomJS(
-            service_args=config.phantomjs_args
-        )
+        pass
 
     def set_page_link(self, page_link, title):
         self.page_link = page_link
         self.url = "http://"+ config.host + self.page_link
         self.bs_obj = None
 
+        self.page_source_in_unicode = ""
         self.detail = {}
         self.detail["标题"] = title
         self.detail["链家编号"] = page_link
@@ -38,19 +38,24 @@ class ItemDetail:
 
     def _get_detail(self):
         retry_cnt = config.retry_cnt
+        headers = config.headers
+        host = config.host
+        proxies = config.proxies
         while True:
             try:
-                self.driver.set_window_size(800, 600)
                 time.sleep(random.randint(1, config.cnt_of_worker+1))
-                self.driver.get(url=self.url)
-                page_source = self.driver.page_source
-                if page_source:
+                response = requests.get(url="http://"+host+self.page_link,
+                                        headers=headers,
+                                        proxies=proxies)
+                if response.status_code == 200:
+                    page_source = response.content
+                    self.page_source_in_unicode = page_source.decode("utf8")
                     self.bs_obj = BeautifulSoup(page_source, "lxml")
                     self.detail["纬度"], self.detail["经度"] = \
                         self.get_position(page_source)
                     self._get_school()
-                    self._get_overview()
                     self._get_base_detail()
+                    self._get_overview()
                     self._get_transaction_info()
 
                     for label, value in self.detail.items():
@@ -63,7 +68,10 @@ class ItemDetail:
                     ConnectionRefusedError,
                     ) as e:
                 msg = "读取房源%s(%s)详细信息时发生错误: %s, 最多再尝试%s次!"
-                logging.error(msg % (self.detail["标题"], self.page_link, e, retry_cnt))
+                logging.error(msg % (self.detail["标题"],
+                                     self.page_link,
+                                     e,
+                                     retry_cnt))
                 if retry_cnt <= 0:
                     break
                 retry_cnt -= 1
@@ -102,12 +110,59 @@ class ItemDetail:
                             (self.detail["标题"], self.page_link, e))
 
         try:
-            tax = self.bs_obj.find("span", {"id": "PanelTax"}).get_text()
-            self.detail["税费"] = float(tax)
-        except AttributeError as e:
+            tax_calculator_obj = self.bs_obj.find("div",
+                                                  {"id": "taxCalculator"})
+            info_objs = tax_calculator_obj.findAll("span",
+                                                   {"class": "itemName"})
+            pattern = ItemDetail.isUnique_pattern
+            is_unique_txt = pattern.findall(self.page_source_in_unicode)[0]
+            tax_info = {
+                "买家首套": config.shoutao,
+                "总价": self.detail["总价"],
+                "卖家唯一":  is_unique_txt.find("不") == -1,
+                "距离上次交易": info_objs[2].get_text().strip(),
+            }
+            self.detail["税费"] = self._get_tax(tax_info)
+        except (AttributeError, IndexError) as e:
             self.detail["税费"] = 0
             logging.warning("房源: %s(%s)获取税费失败! %s" %
                             (self.detail["标题"], self.page_link, e))
+
+    def _get_tax(self, info:dict):
+        """
+        计算房屋交易税
+        :param info:
+        :return: float，总税款
+        """
+        try:
+            logging.debug(info)
+            shoutao = info.get("买家首套", True)
+            if self.detail["建筑面积"] is None:
+                self._get_base_detail()
+            square = self.detail["建筑面积"]
+            qishui_rate = 0.03 if not shoutao else (0.015 if square>90 else 0.01)
+            qishui = qishui_rate * info["总价"]
+            logging.debug("契税: %s" % qishui)
+
+            mianzhenggeshui = info["卖家唯一"] \
+                              and info["距离上次交易"].strip() == "满五年"
+            geshui_rate = 0 if mianzhenggeshui else 0.01
+            geshui = geshui_rate * info["总价"]
+            logging.debug("个税: %s" % geshui)
+
+            yingyeshui_rate = 0
+            weimanliangnian = info["距离上次交易"].strip() == "不满两年"
+            if weimanliangnian:
+                yingyeshui_rate = 0.0563
+            yingyeshui = yingyeshui_rate * info["总价"]
+            logging.debug("营业税: %s" % yingyeshui)
+
+            return qishui + geshui + yingyeshui
+        except KeyError as e:
+            logging.warning("房源: %s(%s)税费计算错误 %s" %
+                            (self.detail["标题"], self.page_link, e))
+            return 0
+
 
     def _read_niandai(self):
         try:
@@ -144,7 +199,8 @@ class ItemDetail:
         """
         try:
             logging.debug("尝试读取位置信息")
-            position = ItemDetail.position_pattern.findall(page_source)[0]
+            page_source_txt = page_source.decode("utf8")
+            position = ItemDetail.position_pattern.findall(page_source_txt)[0]
             # 经度, 纬度
             lnt, lat = [float(value) for value in position.split(",")]
             logging.debug("Position: (%s, %s)" % (lat, lnt))
@@ -263,6 +319,7 @@ class ItemDetail:
             pass
 
 
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
@@ -271,6 +328,7 @@ if __name__ == "__main__":
         "/ershoufang/GZ0002273962.html",
         "/ershoufang/GZ0002186316.html",
         "/ershoufang/GZ0002281204.html",
+        "/ershoufang/GZ0002285106.html",
     ]
     detail_parser = ItemDetail()
     for link in test_links:

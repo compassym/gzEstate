@@ -3,6 +3,7 @@
 import sqlite3
 import os
 import logging
+import datetime
 
 import config
 from item_detail import ItemDetail
@@ -32,8 +33,6 @@ _KeyOfDetails = [
 
     ("产权所属", "TEXT"), ("房本备件", "TEXT"), ("房屋用途", "TEXT"),
     ("交易权属", "TEXT"), ("抵押信息", "TEXT"),
-
-    ("供暖方式", "TEXT"),
 ]
 
 _KeyOfHuxing = [
@@ -50,7 +49,9 @@ def get_db_file():
     else:
         logging.error("按照配置文件构建数据库存储目录失败，将在当前目录构建数据库文件!")
         db_dir = "./"
-    return get_new_db_file(db_dir, config.db)
+    today = datetime.datetime.today()
+    db_file = config.db + today.strftime(".%Y%m%d")
+    return get_new_db_file(db_dir, db_file)
 
 
 def get_new_db_file(db_dir, db_file):
