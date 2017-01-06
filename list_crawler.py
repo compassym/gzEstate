@@ -40,12 +40,13 @@ def get_items_in_page(bs_obj, out_q=None, callback=None):
 def _get_next_page_link(bs_obj):
     try:
         list_page_box = bs_obj.find("div", {"class": "page-box house-lst-page-box"})
+        page_url = list_page_box.attrs["page-url"]
         page_info = json.loads(list_page_box.attrs["page-data"])
         if page_info["totalPage"] == page_info["curPage"]:
             return None
         else:
             next_page = page_info["curPage"] + 1
-            return "/ershoufang/pg%s" % next_page
+            return page_url.replace("{page}", str(next_page))
     except (AttributeError, KeyError):
         pass
 
