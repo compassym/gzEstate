@@ -2,7 +2,6 @@
 # -*- coding:utf-8 -*-
 
 import logging
-import os
 from concurrent.futures import ThreadPoolExecutor
 from threading import Thread
 from queue import Queue
@@ -14,20 +13,6 @@ import tools
 
 
 _ThreadPool = ThreadPoolExecutor(1)
-
-def log_setting():
-    if tools.check_dir(config.log_dir):
-        log_file = os.path.join(config.log_dir, "log.txt")
-        logging.basicConfig(level=config.log_level,
-                            format=config.log_format,
-                            filename=log_file
-                            )
-        console = logging.StreamHandler()
-        console.setLevel(logging.INFO)
-        logging.getLogger('').addHandler(console)
-    else:
-        logging.basicConfig(level=config.log_level,
-                            format=config.log_format)
 
 def consumer_of_pool(page_link, title):
     global _ThreadPool
@@ -46,14 +31,12 @@ def consumer_of_thread(in_q, sentinel):
         detail_crawler.write2db(detail)
 
 
-def main():
-    log_setting()
-
-    for index in range(len(config.towns)):
-        sentinel = object()
-        buffer = Queue()
-        detail_crawler.init_db(town=config.towns[index], city=config.city)
-        first_page = tools.first_page(config.towns[index])
+def crawl(town, city):
+    sentinel = object()
+    buffer = Queue()
+    db_file = detail_crawler.init_db(town=town, city=city)
+    if db_file:
+        first_page = tools.first_page(town)
         list_crawler_thread = Thread(target=list_crawler.get_items,
                                      kwargs={"sentinel": sentinel,
                                              "first_page": first_page,
@@ -73,6 +56,5 @@ def main():
         for t in detail_crawler_threads:
             t.join()
 
+        return db_file
 
-
-main()

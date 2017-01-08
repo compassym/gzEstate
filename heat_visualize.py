@@ -12,6 +12,12 @@ except ImportError:
     baidu_api_ak = None
 
 
+Price_Query = """
+                SELECT
+                "链家编号", "标题", "总价", "建筑面积", "经度", "纬度"
+                FROM houses;
+              """
+API_Pattern_Html = "./baidu_api_pattern.html"
 
 def round_off(x, point_pos):
     return int(x * point_pos + 0.5) / point_pos
@@ -62,7 +68,7 @@ def wash_price(df):
         return positions
 
 
-def handler(db_file, query, api_pattern_html, wash):
+def handle(db_file, wash, query, api_pattern_html=API_Pattern_Html):
     df = read_df(db_file, query)
     positions = wash(df)
 
@@ -72,6 +78,10 @@ def handler(db_file, query, api_pattern_html, wash):
     dest_html = db_file + ".html"
     product_html(center_lnt, center_lat, positions, api_pattern_html, dest_html)
 
+handle_price = partial(handle,
+                       wash=wash_price,
+                       query=Price_Query,
+                       api_pattern_html=API_Pattern_Html)
 
 if __name__ == "__main__":
     def main():
@@ -83,14 +93,8 @@ if __name__ == "__main__":
                      "./data/baiyun@gz.houses.db.20170106",
                      "./data/panyu@gz.houses.db.20170106",
                    ]
-        query = """
-        SELECT
-        "链家编号", "标题", "总价", "建筑面积", "经度", "纬度"
-        FROM houses;
-        """
-        api_pattern_file = "./baidu_api_pattern.html"
         for db_file in db_files:
-            handler(db_file, query, api_pattern_file, wash_price)
+            handle_price(db_file)
 
     main()
 
