@@ -28,8 +28,9 @@ def main():
     towns = config.towns
     if not towns:
         towns = [""]
-    for index in range(len(towns)):
-        db_file = crawler.crawl(towns[index], config.city)
+    discrete = not config.use_single_db
+    db_files = crawler.crawl(towns, config.city, discrete=discrete)
+    for db_file in db_files:
         heat_visualize.handle_price(db_file)
 
 
