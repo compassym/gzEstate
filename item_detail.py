@@ -66,6 +66,7 @@ class ItemDetail:
                     ConnectionResetError,
                     ConnectionAbortedError,
                     ConnectionRefusedError,
+                    requests.exceptions.ConnectionError,
                     ) as e:
                 msg = "读取房源%s(%s)详细信息时发生错误: %s, 最多再尝试%s次!"
                 logging.error(msg % (self.detail["标题"],
