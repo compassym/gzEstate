@@ -20,7 +20,7 @@ towns = ["tianhe", "haizhu", "yuexiu", "liwan", "baiyun", "huangpugz"]
 
 # 存储所爬取数据的数据库文件
 db = "houses.db"
-db_dir = "./data2"
+db_dir = "./data"
 # 将所有区的数据都存储到单一数据库文件并统一处理，
 # 如果为False，则每个区单独建立数据库文件，并各自独立处理
 use_single_db = True
