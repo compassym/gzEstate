@@ -4,24 +4,33 @@ import logging
 
 ######################################################################
 # 目标参数
-towns = ["conghua", "huadou"]
+# 目标城市，需要自行到链家首页找到对应城市的缩写，
+# 如广州链家的网址是"http://gz.lianjia.com"，则广州对应"gz"
 city = "gz"
-host = "%s.lianjia.com" % (city,)
-
-######################################################################
-# 数据存储相关参数
-# 用于存储item列表，可供后续采集详细的描述信息提供链接
-item_list_file = "./data/item_list.csv"
+# 目标城市下面的行政区，需要自行到链家网页找到对应行政区的缩写，不要想当然，
+# 比如广州黄埔区，对应的url是http://gz.lianjia.com/huangpugz"，
+# 因此广州黄浦区对应的是"huangpugz"，而不是"huangpu"，
+# 我估计是因为很多城市存在相同名字的行政区的缘故，
+#
+# 如果towns为空，则一次性抓取city对应城市的所有数据，但是一般不建议这么做，
+# 我也不知道怎么回事，链家网站的房源信息最多只能显示100页，每页30个房源，
+# 因此如果一次抓取整个城市的话，最多只能抓取3000个左右的房源信息。
+# 如果需要将整个城市的房源信息集中处理，可以设置下面的use_single_db为True
+towns = ["tianhe", "haizhu", "yuexiu", "liwan", "baiyun", "huangpugz"]
 
 # 存储所爬取数据的数据库文件
 db = "houses.db"
 db_dir = "./data2"
+# 将所有区的数据都存储到单一数据库文件并统一处理，
+# 如果为False，则每个区单独建立数据库文件，并各自独立处理
+use_single_db = True
 
 
 
 ######################################################################
 # 爬虫参数
 # HTTP Headers
+host = "%s.lianjia.com" % (city,)
 headers = {
     "Host": host,
     "User-Agent": "Mozilla/5.0(X11;Linux x86_64; rv:49.0) Gecko/20100101 Firefox/49.0",
