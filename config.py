@@ -15,7 +15,7 @@ item_list_file = "./data/item_list.csv"
 
 # 存储所爬取数据的数据库文件
 db = "houses.db"
-db_dir = "./data"
+db_dir = "./data2"
 
 
 
@@ -28,7 +28,7 @@ headers = {
     "Accept": "text/html, application/xhtml+xml, application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.5",
     "Accept-Encoding": "gzip,deflate",
-    "Referer": "http://gz.lianjia.com",
+    "Referer": "http://%s" % host,
     "Cookie": "select_city=440100; all-lj=75cfc00b9f12050e3970154c91c12727;"
               " lianjia_ssid=4563aa73-3a86-4eea-b5b4-9df0af3beedd; "
               "lianjia_uuid=73f97095-56fa-4716-a585-219125ac851f; "
