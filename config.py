@@ -4,7 +4,7 @@ import logging
 
 ######################################################################
 # 目标参数
-towns = ["panyu", "baiyun", "huadou"]
+towns = ["conghua", "huadou"]
 city = "gz"
 host = "%s.lianjia.com" % (city,)
 

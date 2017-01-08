@@ -122,6 +122,7 @@ def init_db(town, city):
         cursor = db_conn.cursor()
         create_table(cursor)
         db_conn.commit()
+        return _DB_File
 
 
 def write2db_for_pool_callback(future):
