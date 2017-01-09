@@ -4,6 +4,7 @@
 
 import pandas as pd
 import sqlite3
+import datetime
 import json
 from functools import partial
 try:
@@ -17,6 +18,12 @@ Price_Query = """
                 "链家编号", "标题", "总价", "建筑面积", "经度", "纬度"
                 FROM houses;
               """
+House_Age_Query = """
+                SELECT
+                "链家编号", "标题", "建筑年代", "经度", "纬度"
+                FROM houses;
+"""
+
 API_Pattern_Html = "./baidu_api_pattern.html"
 
 def round_off(x, point_pos):
@@ -53,48 +60,64 @@ def product_html(center_lnt, center_lat, positions, api_pattern_html, dest_html)
 
 
 def wash_price(df):
-        df["单价"] = df["总价"] / df["建筑面积"]
-        map_fn = partial(round_off, point_pos=10000.0)
-        df["经度_集中"] = df["经度"].map(map_fn)
-        df["纬度_集中"] = df["纬度"].map(map_fn)
+    df["单价"] = df["总价"] / df["建筑面积"]
+    map_fn = partial(round_off, point_pos=10000.0)
+    df["经度_集中"] = df["经度"].map(map_fn)
+    df["纬度_集中"] = df["纬度"].map(map_fn)
 
-        df_group = df.groupby([df["经度_集中"], df["纬度_集中"]]).mean()
-        df_group["单价"] = df_group["单价"]\
-                           .map(partial(round_off, point_pos=10.0)) * 10.0
-        to_dict = lambda row : \
-            {"lng": row["经度_集中"], "lat": row["纬度_集中"], "count": row["单价"]}
-        positions = [to_dict(df_group.ix[index]) for index in df_group.index]
+    df_group = df.groupby([df["经度_集中"], df["纬度_集中"]]).mean()
+    df_group["单价"] = df_group["单价"]\
+                       .map(partial(round_off, point_pos=10.0)) * 10.0
+    to_dict = lambda row : \
+        {"lng": row["经度_集中"], "lat": row["纬度_集中"], "count": row["单价"]}
+    positions = [to_dict(df_group.ix[index]) for index in df_group.index]
 
-        return positions
+    return positions
+
+def wash_house_age(df):
+    df["楼龄"] = df["建筑年代"] - datetime.datetime.today().year
+    df["楼龄"] = df["楼龄"] * (-1)
+
+    map_fn = partial(round_off, point_pos=10000.0)
+    df["经度_集中"] = df["经度"].map(map_fn)
+    df["纬度_集中"] = df["纬度"].map(map_fn)
+
+    df_group = df.groupby([df["经度_集中"], df["纬度_集中"]]).mean()
+    to_dict = lambda row : \
+        {"lng": row["经度_集中"], "lat": row["纬度_集中"], "count": row["楼龄"]}
+    positions = [to_dict(df_group.ix[index]) for index in df_group.index]
+
+    return positions
 
 
-def handle(db_file, wash, query, api_pattern_html=API_Pattern_Html):
+def handle(db_file, wash, query, dest_html_pretend, api_pattern_html=API_Pattern_Html):
     df = read_df(db_file, query)
     positions = wash(df)
 
     center_lnt = (df["经度"].max() + df["经度"].min())/2.0
     center_lat = (df["纬度"].max() + df["纬度"].min())/2.0
 
-    dest_html = db_file + ".html"
+    dest_html = ".".join([db_file, dest_html_pretend, ".html"])
     product_html(center_lnt, center_lat, positions, api_pattern_html, dest_html)
 
 handle_price = partial(handle,
                        wash=wash_price,
                        query=Price_Query,
+                       dest_html_pretend="price",
                        api_pattern_html=API_Pattern_Html)
+
+handle_house_age = partial(handle,
+                           wash=wash_house_age,
+                           query=House_Age_Query,
+                           dest_html_pretend="house_age",
+                           api_pattern_html=API_Pattern_Html)
 
 if __name__ == "__main__":
     def main():
-        db_files = [ "./data/haizhu@gz.houses.db.20170106",
-                     "./data/yuexiu@gz.houses.db.20170106",
-                    "./data/huangpugz@gz.houses.db.20170106",
-                     "./data/tianhe@gz.houses.db.20170106",
-                    "./data/liwan@gz.houses.db.20170106",
-                     "./data/baiyun@gz.houses.db.20170106",
-                     "./data/panyu@gz.houses.db.20170106",
-                   ]
+        db_files = [ "./data/gz.houses.db.20170108", ]
         for db_file in db_files:
             handle_price(db_file)
+            handle_house_age(db_file)
 
     main()
 
