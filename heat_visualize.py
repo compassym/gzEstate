@@ -75,8 +75,10 @@ def wash_price(df):
     return positions
 
 def wash_house_age(df):
+    df = df[df["建筑年代"] != -1]
     df["楼龄"] = df["建筑年代"] - datetime.datetime.today().year
     df["楼龄"] = df["楼龄"] * (-1)
+    print(df)
 
     map_fn = partial(round_off, point_pos=10000.0)
     df["经度_集中"] = df["经度"].map(map_fn)
