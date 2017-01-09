@@ -32,6 +32,7 @@ def main():
     db_files = crawler.crawl(towns, config.city, discrete=discrete)
     for db_file in db_files:
         heat_visualize.handle_price(db_file)
+        heat_visualize.handle_house_age(db_file)
 
 
 main()

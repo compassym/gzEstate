@@ -4,8 +4,11 @@
 ### What is this repository for? ###
 
 * Quick summary: 
- 搭好依赖环境后，运行python3 main.py，最终将在指定目录生成html文件，使用浏览器打开该html文件即可得到房价热图：
- ![广州房价](https://raw.githubusercontent.com/compassym/gzEstate/develop/images/heat_of_gz_estate_price.png)
+ 搭好依赖环境后，运行python3 main.py，最终将在指定目录生成html文件，
+ 使用浏览器打开该html文件即可得到房价热图：
+ ![广州房价](./images/heat_of_gz_estate_price.png)
+ 以及楼龄热图：
+ ![广州二手房楼龄热图](./images/heat_of_gz_estate_house_age.png)
 * Version: 算alpha版吧
 
 ### 怎样运行? ###
